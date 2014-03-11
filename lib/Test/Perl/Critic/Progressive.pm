@@ -79,8 +79,9 @@ sub progressive_critic_ok {
     $CRITIC = Perl::Critic->new( get_critic_args() );
     my @violations = map { $CRITIC->critique($_) } @files;
 
-    my $ok = _evaluate_test( @violations );
+    my ($ok, $diag) = _evaluate_test( @violations );
     $TEST->ok($ok, __PACKAGE__);
+    $TEST->diag($_) for @$diag;
     return $ok;
 }
 
@@ -156,6 +157,7 @@ sub _evaluate_test {
 
     my $ok = 1;
     my $results = {};
+    my $diag = [];
 
     my $history_data = _read_history( get_history_file() );
     my $last_critique = $history_data->[-1];
@@ -185,7 +187,7 @@ sub _evaluate_test {
         if ( $policy_violations > $target ) {
             my $short_name = policy_short_name($policy_name);
             my $diagf = '%s: Got %i violation(s).  Expected no more than %i.';
-            $TEST->diag( sprintf $diagf, $short_name, $policy_violations, $target );
+            push @$diag, sprintf($diagf, $short_name, $policy_violations, $target);
             $ok = 0; # Failed the test!
         }
     }
@@ -200,8 +202,9 @@ sub _evaluate_test {
 
         if ( $current_total_violations > $target ) {
             my $got = $current_total_violations;
-            $TEST->diag('Too many Perl::Critic violations...');
-            $TEST->diag("Got a total of $got. Expected no more than $target.");
+            push @$diag,
+                 'Too many Perl::Critic violations...',
+                 "Got a total of $got. Expected no more than $target.";
             $ok = 0;
         }
     }
@@ -215,7 +218,7 @@ sub _evaluate_test {
     }
 
 
-    return $ok;
+    return ($ok, $diag);
 }
 
 #---------------------------------------------------------------------------
